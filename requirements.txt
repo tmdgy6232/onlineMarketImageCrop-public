@@ -1,0 +1,10 @@
+requests>=2.32
+Pillow>=10.4
+openpyxl>=3.1
+tqdm>=4.66
+
+# 선택 의존성.
+# 브라우저 렌더링이 필요한 사이트(어댑터의 needs_browser = True)에서만 쓴다.
+# 설치 후 'playwright install chromium' 을 한 번 실행해야 한다.
+# 미설치 상태에서도 HTTP로 추출되는 사이트는 정상 동작한다.
+playwright>=1.47

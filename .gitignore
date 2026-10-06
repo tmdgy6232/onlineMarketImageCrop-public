@@ -1,0 +1,15 @@
+# 실행 산출물 (상품 이미지, 리포트, 로그)
+output/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+
+# 에디터 / OS
+.vscode/
+.idea/
+Thumbs.db
+desktop.ini

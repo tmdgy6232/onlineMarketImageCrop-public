@@ -84,10 +84,12 @@ def make_main_image(data: bytes, size: int | None = None) -> Image.Image:
 def build_detail_images(
     datas: list[bytes],
     width: int | None = None,
+    header: Image.Image | None = None,
 ) -> list[Image.Image]:
     """상세이미지를 세로로 이어붙인다.
 
     각 이미지를 가로 `width`로 비율 유지 리사이즈한 뒤 위에서 아래로 연결한다.
+    `header`가 있으면 맨 위에 붙인다.
     JPEG 높이 한계를 넘으면 여러 장으로 나눠 반환한다.
 
     반환값이 1장이면 `{코드}_detail.jpg`,
@@ -110,6 +112,11 @@ def build_detail_images(
 
     if not tiles:
         raise ImageProcessingError("상세이미지로 쓸 수 있는 이미지가 없습니다")
+
+    # 양식은 상품 이미지가 하나라도 있을 때만 맨 위에 붙인다.
+    # 크기 필터(is_usable)는 적용하지 않는다. 양식은 상품 사진이 아니다.
+    if header is not None:
+        tiles.insert(0, _resize_to_width(header, width))
 
     # 2) 한 장만으로도 높이 한계를 넘는 이미지는 먼저 잘라둔다.
     #    (아주 긴 세로형 상세컷을 쓰는 사이트 대비)

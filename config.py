@@ -25,6 +25,33 @@ BG_COLOR = (255, 255, 255)
 # 저장 품질
 JPEG_QUALITY = 90
 
+# ------------------------------------------------------- 상세 상단 양식(헤더)
+
+# 상세이미지 맨 위에 상품명/모델명이 적힌 양식을 붙일지 여부
+HEADER_ENABLED = True
+
+# 글자가 비어있는 양식 이미지
+HEADER_TEMPLATE_PATH = "samples/top_format_clear.jpg"
+
+HEADER_FONT_PATH = r"C:\Windows\Fonts\malgunbd.ttf"   # 맑은 고딕 Bold
+HEADER_FONT_MAX_SIZE = 48
+HEADER_FONT_MIN_SIZE = 12
+
+# 글자를 그릴 세로 구간 (y0, y1). 양식 이미지 기준 좌표다.
+# top_format_clear.jpg 의 MODEL / NO. 줄 위치에서 측정했다.
+HEADER_NAME_BAND = (75, 100)    # 상품명
+HEADER_CODE_BAND = (117, 138)   # 모델명
+
+# 글자의 가로 중심과 최대 폭. 양식 왼쪽 바코드 영역을 침범하지 않는 선이다.
+HEADER_CENTER_X = 478
+HEADER_TEXT_MAX_WIDTH = 500
+
+HEADER_TEXT_COLOR = (0, 0, 0)
+
+# 양식 아래쪽 순백 여백을 잘라낸다. 남겨둘 여백(px).
+HEADER_TRIM_BOTTOM_WHITE = True
+HEADER_BOTTOM_MARGIN = 0
+
 # --------------------------------------------------------------- 이미지 필터
 
 # 이 크기보다 작은 이미지는 아이콘/더미로 보고 상세에서 제외한다.

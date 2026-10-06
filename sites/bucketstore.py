@@ -11,7 +11,7 @@ import json
 import logging
 import re
 
-from .base import ProductNotFound, SiteAdapter
+from .base import ProductInfo, ProductNotFound, SiteAdapter
 
 log = logging.getLogger(__name__)
 
@@ -21,6 +21,10 @@ _IMAGE_LIST_ESCAPED = re.compile(r'\\"imageList\\":(\[[^\]]*\])')
 
 # 혹시 이스케이프되지 않은 형태로 노출되는 경우(API 응답 등)도 대비한다.
 _IMAGE_LIST_PLAIN = re.compile(r'"imageList":(\[[^\]]*\])')
+
+# 상품명
+_GOODS_NAME_ESCAPED = re.compile(r'\\"goodsName\\":\\"([^\\"]+)\\"')
+_GOODS_NAME_PLAIN = re.compile(r'"goodsName":"([^"]+)"')
 
 # 제외 패턴.
 #
@@ -58,7 +62,7 @@ class BucketStoreAdapter(SiteAdapter):
     def get_product_url(self, code: str) -> str:
         return self.PRODUCT_URL.format(code=code)
 
-    def _fetch_image_urls(self, code: str) -> list[str]:
+    def _fetch_product(self, code: str) -> ProductInfo:
         url = self.get_product_url(code)
 
         html = self.ctx.http.get_html(url)
@@ -76,7 +80,16 @@ class BucketStoreAdapter(SiteAdapter):
                 f"상품 페이지에서 이미지를 찾지 못했습니다 (품절/삭제 추정): {code}"
             )
 
-        return urls
+        return ProductInfo(image_urls=urls, name=self._parse_name(html))
+
+    @staticmethod
+    def _parse_name(html: str) -> str:
+        """상품명을 뽑는다. 못 찾으면 빈 문자열."""
+        match = _GOODS_NAME_ESCAPED.search(html) or _GOODS_NAME_PLAIN.search(html)
+        if not match:
+            log.warning("상품명을 찾지 못했습니다")
+            return ""
+        return match.group(1).strip()
 
     @classmethod
     def _parse_image_list(cls, html: str) -> list[str]:

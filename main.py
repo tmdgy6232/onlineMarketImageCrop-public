@@ -20,7 +20,8 @@ from pathlib import Path
 from tqdm import tqdm
 
 import config
-from core import downloader, image_processor as improc
+from core import downloader, header as header_mod, image_processor as improc
+from core.header import HeaderError
 from core.excel_io import ResultRow, read_codes, write_report
 from core.fetcher import FetchContext, FetchError
 from sites import AdapterPool, ProductNotFound, UnknownSite, available_sites
@@ -106,7 +107,15 @@ def process_one(ctx, adapter, code: str, out_dir: Path) -> ResultRow:
     if not blobs:
         raise improc.ImageProcessingError("상세 이미지를 한 장도 받지 못했습니다")
 
-    detail_imgs = improc.build_detail_images(blobs)
+    # 상세 맨 위에 붙일 양식. 상품명/모델명을 적어 넣는다.
+    head = None
+    if config.HEADER_ENABLED:
+        name = adapter.get_product_name(code)
+        if not name:
+            warnings.append("상품명을 찾지 못해 양식의 상품명이 비어 있음")
+        head = header_mod.build_header(name, code)
+
+    detail_imgs = improc.build_detail_images(blobs, header=head)
     names = improc.detail_filenames(code, len(detail_imgs))
     total_height = 0
     for img, name in zip(detail_imgs, names):
@@ -152,6 +161,16 @@ def main(argv=None) -> int:
         log.error("처리할 상품코드가 없습니다: %s", input_path)
         return 1
 
+    # 양식과 폰트는 시작할 때 확인한다.
+    # 상품을 다 돌린 뒤에 양식이 없다는 걸 알게 되면 늦다.
+    if config.HEADER_ENABLED:
+        try:
+            header_mod.check_template()
+        except HeaderError as exc:
+            log.error("%s", exc)
+            return 1
+        log.info("상세 상단 양식: %s", config.HEADER_TEMPLATE_PATH)
+
     log.info("상품 %d건을 처리합니다 (기본 사이트: %s)", len(rows), default_site)
 
     results: list[ResultRow] = []
@@ -165,7 +184,7 @@ def main(argv=None) -> int:
                 results.append(process_one(ctx, adapter, row.code, run_dir))
                 log.info("성공: %s", row.code)
 
-            except (ProductNotFound, UnknownSite, FetchError,
+            except (ProductNotFound, UnknownSite, FetchError, HeaderError,
                     improc.ImageProcessingError) as exc:
                 # 예상 가능한 실패. 상품 1건만 실패로 기록하고 계속 진행한다.
                 log.warning("실패: %s — %s", row.code, exc)

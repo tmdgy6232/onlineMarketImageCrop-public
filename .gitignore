@@ -13,3 +13,6 @@ venv/
 .idea/
 Thumbs.db
 desktop.ini
+
+# 엑셀이 파일을 열 때 만드는 잠금 파일
+~$*

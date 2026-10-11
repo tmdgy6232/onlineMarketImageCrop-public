@@ -92,8 +92,8 @@ def build_detail_images(
     `header`가 있으면 맨 위에 붙인다.
     JPEG 높이 한계를 넘으면 여러 장으로 나눠 반환한다.
 
-    반환값이 1장이면 `{코드}_detail.jpg`,
-    2장 이상이면 `{코드}_detail_01.jpg`, `_02.jpg` ... 로 저장한다.
+    반환값이 1장이면 `{코드}.jpg`,
+    2장 이상이면 `{코드}_01.jpg`, `_02.jpg` ... 로 저장한다.
     """
     width = width or config.DETAIL_WIDTH
     gap = config.DETAIL_GAP
@@ -154,11 +154,19 @@ def save_jpeg(img: Image.Image, path) -> None:
     img.save(path, "JPEG", quality=config.JPEG_QUALITY, optimize=True)
 
 
+def main_filename(code: str) -> str:
+    """대표이미지 파일명을 만든다. 예: 221D3JP201_BG_300.jpg"""
+    return f"{code}{config.MAIN_FILENAME_SUFFIX}.jpg"
+
+
 def detail_filenames(code: str, count: int) -> list[str]:
-    """상세이미지 파일명을 만든다. 2장 이상이면 _01, _02 ... 를 붙인다."""
+    """상세이미지 파일명을 만든다. 예: 221D3JP201_BG.jpg
+
+    2장 이상이면 _01, _02 ... 를 붙인다.
+    """
     if count == 1:
-        return [f"{code}_detail.jpg"]
-    return [f"{code}_detail_{i:02d}.jpg" for i in range(1, count + 1)]
+        return [f"{code}.jpg"]
+    return [f"{code}_{i:02d}.jpg" for i in range(1, count + 1)]
 
 
 # ------------------------------------------------------------------ 내부 헬퍼

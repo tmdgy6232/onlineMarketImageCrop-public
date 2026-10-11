@@ -69,6 +69,32 @@ class HttpFetcher:
         """이미지 등 바이너리를 bytes로 반환한다."""
         return self._request(url, referer=referer).content
 
+    def exists(self, url, referer=None) -> bool:
+        """URL에 파일이 있는지 HEAD 요청으로 확인한다.
+
+        번호를 올려가며 이미지가 어디까지 있는지 찾을 때 쓴다.
+        404 같은 '없음' 응답은 재시도하지 않고 바로 False를 돌려준다.
+        연결 오류만 재시도하고, 끝내 실패하면 FetchError.
+        """
+        headers = {"Referer": referer} if referer else None
+        last_error = None
+
+        for attempt in range(1, config.MAX_RETRIES + 1):
+            try:
+                resp = self._session.head(
+                    url,
+                    headers=headers,
+                    timeout=config.REQUEST_TIMEOUT,
+                    allow_redirects=True,
+                )
+                return resp.status_code == 200
+            except requests.RequestException as exc:
+                last_error = exc
+                if attempt < config.MAX_RETRIES:
+                    time.sleep(config.RETRY_BACKOFF * (2 ** (attempt - 1)))
+
+        raise FetchError(f"{config.MAX_RETRIES}회 재시도 실패: {url} ({last_error})")
+
     def close(self):
         self._session.close()
 

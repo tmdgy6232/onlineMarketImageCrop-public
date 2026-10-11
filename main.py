@@ -97,7 +97,7 @@ def process_one(ctx, adapter, code: str, out_dir: Path) -> ResultRow:
     # 2) 대표이미지
     main_blob = downloader.download(ctx, main_url, referer=referer)
     main_img = improc.make_main_image(main_blob)
-    main_name = f"{code}_main.jpg"
+    main_name = improc.main_filename(code)
     improc.save_jpeg(main_img, product_dir / main_name)
 
     # 3) 상세이미지

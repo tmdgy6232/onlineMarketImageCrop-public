@@ -7,12 +7,14 @@ main.py 에는 사이트별 분기가 생기지 않는다.
 
 from .base import ProductNotFound, SiteAdapter
 from .bucketstore import BucketStoreAdapter
+from .descente import DescenteAdapter
 
 # 사이트 이름 → 어댑터 클래스
 _ADAPTER_CLASSES = {
     cls.name: cls
     for cls in (
         BucketStoreAdapter,
+        DescenteAdapter,
         # 여기에 새 어댑터를 추가한다.
     )
 }

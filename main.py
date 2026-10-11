@@ -93,6 +93,10 @@ def process_one(ctx, adapter, code: str, out_dir: Path) -> ResultRow:
     product_dir.mkdir(parents=True, exist_ok=True)
 
     warnings = []
+    # 어댑터가 남긴 메모 (예: 색상 자동 매칭). 성공이어도 확인이 필요한 내용이다.
+    note = adapter.get_note(code)
+    if note:
+        warnings.append(note)
 
     # 2) 대표이미지
     main_blob = downloader.download(ctx, main_url, referer=referer)

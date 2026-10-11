@@ -36,6 +36,10 @@ _D_FOLDER = "D/620"
 # 끝없이 요청하지 않게 하는 안전장치일 뿐, 보통은 첫 404에서 멈춘다.
 _MAX_SHOTS = 40
 
+# _ 없이 적힌 품번(SQ323UKC94PAT0)을 나눌 때의 자릿수. 품번 10자리 + 색상 4자리.
+_BASE_LEN = 10
+_COLOR_LEN = 4
+
 _TITLE = re.compile(r"<title>(.*?)</title>", re.S | re.I)
 
 # 없는 품번이면 공식몰이 이 제목의 안내 페이지를 준다.
@@ -60,26 +64,81 @@ class DescenteAdapter(SiteAdapter):
         return self.PRODUCT_URL.format(base=base, color=color)
 
     def _fetch_product(self, code: str) -> ProductInfo:
-        base, _ = self._split(code)
-        code = code.strip().upper()
+        base, color = self._split(code)
+        page = self._fetch_page(code)
+        note = ""
+
+        # 이미지 서버 파일명은 항상 '품번_색상' 형식이다. 엑셀에 _ 없이 적혀 있어도 맞춘다.
+        urls = self._collect(base, f"{base}_{color}", _N_FOLDER, "N")
+
+        if not urls:
+            # 엑셀 색상 코드가 공식몰 표기와 다를 수 있다 (예: BRN0 ↔ BRWN).
+            # 공식몰에 실제로 있는 색상 중 확실히 하나로 좁혀질 때만 바꿔 쓴다.
+            available = self._parse_colors(page, base)
+            matched = self._match_color(color, available)
+            if matched is None:
+                listed = ", ".join(available) if available else "없음"
+                raise ProductNotFound(
+                    f"데상트 서버에 이미지 없음: {code} (공식몰 색상: {listed})"
+                )
+            urls = self._collect(base, f"{base}_{matched}", _N_FOLDER, "N")
+            if not urls:
+                raise ProductNotFound(f"데상트 서버에 이미지 없음: {code}")
+            note = f"색상 자동 매칭: {color} → {matched}"
+            log.info("%s: %s", code, note)
+            color = matched
 
         # 상품 컷 → 옛 상품의 디테일 컷 순서로 이어붙인다.
-        urls = self._collect(base, code, _N_FOLDER, "N")
-        if not urls:
-            raise ProductNotFound(f"데상트 서버에 이미지 없음: {code}")
-        urls += self._collect(base, code, _D_FOLDER, "D")
+        urls += self._collect(base, f"{base}_{color}", _D_FOLDER, "D")
 
-        return ProductInfo(image_urls=urls, name=self._fetch_name(code))
+        return ProductInfo(image_urls=urls, name=self._parse_name(page, code), note=note)
 
     # ------------------------------------------------------------- 내부
 
     @staticmethod
+    def _parse_colors(page: str, base: str) -> list[str]:
+        """공식몰 상품 페이지에 이미지가 걸린 색상 코드 목록 (등장 순서)."""
+        found = re.findall(rf"/{re.escape(base)}_([A-Z0-9]{{4}})_[ND]\d+", page, re.I)
+        return list(dict.fromkeys(c.upper() for c in found))
+
+    @staticmethod
+    def _match_color(color: str, available: list[str]) -> str | None:
+        """엑셀 색상과 같은 색으로 보이는 공식몰 색상을 고른다. 확실하지 않으면 None.
+
+        끝의 0(자리 채움)을 떼고, 첫 글자가 같으며 엑셀 쪽 글자들이 공식몰 쪽에
+        같은 순서로 들어 있으면 후보로 본다. 후보가 정확히 1개일 때만 채택한다.
+            BRN0 → BRN ⊂ BRWN  (채택)
+        """
+        def core(c: str) -> str:
+            return c.rstrip("0") or c
+
+        def is_subsequence(short: str, long: str) -> bool:
+            it = iter(long)
+            return all(ch in it for ch in short)
+
+        want = core(color)
+        candidates = [
+            c for c in available
+            if c != color and core(c)[:1] == want[:1]
+            and (is_subsequence(want, core(c)) or is_subsequence(core(c), want))
+        ]
+        return candidates[0] if len(candidates) == 1 else None
+
+    @staticmethod
     def _split(code: str) -> tuple[str, str]:
-        """품번을 base 와 color 로 나눈다."""
-        base, sep, color = code.strip().upper().partition("_")
-        if not sep or not color or len(base) < 3:
+        """품번을 base 와 color 로 나눈다.
+
+        SQ323UKC94_PAT0 와 SQ323UKC94PAT0 둘 다 받는다.
+        _ 가 없으면 앞 10자리를 품번, 뒤 4자리를 색상으로 본다.
+        """
+        code = code.strip().upper()
+        base, sep, color = code.partition("_")
+        if not sep and len(code) == _BASE_LEN + _COLOR_LEN:
+            base, color = code[:_BASE_LEN], code[_BASE_LEN:]
+        if not color or len(base) < 3:
             raise ProductNotFound(
-                f"데상트 품번 형식이 아닙니다 (예: SQ323UKC94_PAT0): {code}"
+                f"데상트 품번 형식이 아닙니다 "
+                f"(예: SQ323UKC94_PAT0 또는 SQ323UKC94PAT0): {code}"
             )
         return base, color
 
@@ -95,14 +154,13 @@ class DescenteAdapter(SiteAdapter):
         log.debug("%s: %s 컷 %d장", code, kind, len(urls))
         return urls
 
-    def _fetch_name(self, code: str) -> str:
-        """공식몰 상품 페이지 제목에서 상품명을 뽑는다. 못 찾으면 빈 문자열."""
+    def _fetch_page(self, code: str) -> str:
+        """공식몰 상품 페이지. 상품명과 색상 목록을 여기서 뽑는다. 실패하면 빈 문자열."""
         try:
-            page = self.ctx.http.get_html(self.get_product_url(code))
+            return self.ctx.http.get_html(self.get_product_url(code))
         except FetchError as exc:
-            log.warning("상품명을 가져오지 못했습니다: %s (%s)", code, exc)
+            log.warning("공식몰 페이지를 가져오지 못했습니다: %s (%s)", code, exc)
             return ""
-        return self._parse_name(page, code)
 
     @staticmethod
     def _parse_name(page: str, code: str) -> str:
@@ -113,6 +171,6 @@ class DescenteAdapter(SiteAdapter):
             return ""
         name = _BRAND_PREFIX.sub("", title)
         # 끝에 품번이 붙어 있으면 뗀다. 모델명 줄에 이미 들어간다.
-        base = code.partition("_")[0]
+        base = DescenteAdapter._split(code)[0]
         name = re.sub(rf"\s*\(?{re.escape(base)}[^)]*\)?\s*$", "", name, flags=re.I)
         return name.strip()

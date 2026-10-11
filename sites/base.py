@@ -18,6 +18,7 @@ class ProductInfo:
 
     image_urls: list[str] = field(default_factory=list)  # 위→아래 순서
     name: str = ""                                       # 상품명 (양식 헤더에 쓴다)
+    note: str = ""                                       # 결과 리포트에 남길 메모 (예: 색상 자동 매칭)
 
 
 class ProductNotFound(Exception):
@@ -81,6 +82,10 @@ class SiteAdapter(ABC):
         뽑지 못하는 사이트는 빈 문자열을 반환한다. 그 경우 양식의 상품명 줄은 비게 된다.
         """
         return self._product(code).name
+
+    def get_note(self, code: str) -> str:
+        """결과 리포트 메시지 칸에 남길 메모. 없으면 빈 문자열."""
+        return self._product(code).note
 
     # 대표와 상세의 출처가 다른 사이트는 위 메서드들을 오버라이드하면 된다.
 
